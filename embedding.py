@@ -5,20 +5,12 @@ Embeds sentences using SentenceTransformer, reduces dimensionality
 with t-SNE, and visualizes the results with Plotly.
 """
 
-import sys
-
+from IPython.display import HTML, display
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
 from sklearn.manifold import TSNE
 import plotly.graph_objs as go
-import plotly.io as pio
 from plotly.subplots import make_subplots
-
-# The "colab" renderer only renders correctly inside genuine Google Colab;
-# elsewhere it produces a blank plot. Pick the renderer at import time so the
-# notebook works without a manual pio.renderers.default override.
-if "google.colab" in sys.modules:
-    pio.renderers.default = "colab"
 
 
 def embed_sentences(text, model_name="all-MiniLM-L6-v2"):
@@ -65,4 +57,8 @@ def plot_embeddings(x_cra, y_cra, cra_labels, x_mbp, y_mbp, mbp_labels):
     )
 
     fig.update_layout(title="Sentence Embeddings")
-    fig.show()
+
+    # Render as self-contained HTML instead of fig.show(). This bypasses
+    # Plotly's renderer system, which produces a blank plot in Colab when the
+    # installed Plotly version is out of sync with Colab's frontend.
+    display(HTML(fig.to_html(include_plotlyjs="cdn", full_html=False)))
