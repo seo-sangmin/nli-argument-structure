@@ -5,6 +5,9 @@ Embeds sentences using SentenceTransformer, reduces dimensionality
 with t-SNE, and visualizes the results with Plotly.
 """
 
+import html as html_lib
+
+from IPython.display import HTML, display
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
 from sklearn.manifold import TSNE
@@ -55,5 +58,16 @@ def plot_embeddings(x_cra, y_cra, cra_labels, x_mbp, y_mbp, mbp_labels):
         row=1, col=2,
     )
 
-    fig.update_layout(title="Sentence Embeddings")
-    fig.show()
+    fig.update_layout(title="Sentence Embeddings", height=500)
+
+    # Render inside an isolated <iframe> via srcdoc. Displaying Plotly HTML
+    # directly in Colab fails silently: Colab loads requirejs, plotly.js
+    # registers as an AMD module instead of a global, and the draw script
+    # never finds `Plotly`. A separate iframe document has no requirejs, so
+    # plotly.js loads as a plain global script and the plot renders.
+    doc = fig.to_html(include_plotlyjs="cdn", full_html=True)
+    srcdoc = html_lib.escape(doc, quote=True)
+    display(HTML(
+        f'<iframe srcdoc="{srcdoc}" width="100%" height="520" '
+        f'style="border:none;"></iframe>'
+    ))
