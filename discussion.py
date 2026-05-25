@@ -1,29 +1,34 @@
 """
 Discussion and limits analysis module.
 
-Demonstrates the limitations of using NLI for argument structure
-identification, covering:
-- Label accuracy limits
-- Need for argument mining
-- Need for probabilistic analysis
-- Need for justification
+Provides granular helpers for Section 4 (Limits of Identifying the
+Argument Structure in Searle's Texts Using NLI):
+- 4.1 Limits of labeling argument types
+- 4.2 Need for argument mining
+- 4.3 Need for probabilistic analysis
+- 4.4 Need for justification
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import comb
 
-from nli_analysis import predict_nli, define_mbp_argument, define_larger_argument
+from nli_analysis import (
+    predict_nli,
+    define_mbp_argument,
+    define_cra_argument,
+    define_larger_argument,
+)
 
+
+# --- 4.1 helpers ---
 
 def show_entailment_cases(combined_df):
-    """Display only the cases where the human prediction is entailment."""
-    entail_df = combined_df[combined_df["Human Prediction"] == "entailment"]
-    print("Cases where human prediction is 'entailment':")
-    print(entail_df)
-    print()
-    return entail_df
+    """Return rows from combined_df where the human prediction is 'entailment'."""
+    return combined_df[combined_df["Human Prediction"] == "entailment"]
 
+
+# --- 4.2 helpers ---
 
 def plot_nli_complexity(max_n=20):
     """Plot the growth of possible NLI comparisons vs 2^n.
@@ -31,24 +36,26 @@ def plot_nli_complexity(max_n=20):
     Shows why exhaustive NLI analysis is infeasible for texts
     with many sentences.
     """
-    def nli_execution_count(n):
-        """Number of different NLI comparisons for n sentences."""
+    def nli_exe(n):
         total = 0
         for k in range(1, n):
             total += comb(n, k) * comb(n - k, 1)
         return total
 
+    def two_power(n):
+        return 2 ** n
+
     n_values = np.arange(1, max_n + 1)
-    nli_counts = [nli_execution_count(n) for n in n_values]
-    power_of_two = [2**n for n in n_values]
+    nli_exe_values = [nli_exe(n) for n in n_values]
+    two_power_values = [two_power(n) for n in n_values]
 
     plt.figure(figsize=(10, 6))
     plt.plot(
-        n_values, nli_counts,
+        n_values, nli_exe_values,
         label=r"$\sum_{k=1}^{n-1} \binom{n}{k} \cdot \binom{n-k}{1}$",
         marker="o",
     )
-    plt.plot(n_values, power_of_two, label=r"$2^n$", marker="x")
+    plt.plot(n_values, two_power_values, label=r"$2^n$", marker="x")
     plt.xlabel("n")
     plt.ylabel("Value")
     plt.title(r"$2^n$ and the number of different NLI for $n$ sentences")
@@ -57,141 +64,77 @@ def plot_nli_complexity(max_n=20):
     plt.show()
 
 
-def demonstrate_probabilistic_need(nli_model):
-    """Show examples where probabilistic labels would be more informative."""
-    print("=== Probabilistic Analysis Examples ===\n")
+def print_conclusions():
+    """Print the conclusion strings for CRA, LARG, and MBP."""
+    _, conc_cra = define_cra_argument()
+    _, conc_larg = define_larger_argument()
+    _, conc_mbp = define_mbp_argument()
+    print(conc_cra)
+    print(conc_larg)
+    print(conc_mbp)
 
-    # General example
+
+# --- 4.3 helpers ---
+
+def example_boy_ball(nli_model):
+    """Boy hits a ball / playing baseball example from Chen et al. (2020)."""
     p1 = "A boy hits a ball with a bat."
     h1 = "The boy is playing in a baseball game."
-    print(f"P: {p1}")
-    print(f"H: {h1}")
-    print(f"Prediction: {predict_nli(nli_model, p1, h1)}")
-    print()
-
-    # MBP single premise to conclusion
-    mbp_premises, mbp_conclusion = define_mbp_argument()
-    room_mbp = mbp_premises[0]
-    print(f"P: {room_mbp}")
-    print(f"H: {mbp_conclusion}")
-    print(f"Prediction: {predict_nli(nli_model, room_mbp, mbp_conclusion)}")
-    print()
-
-    # LARG partial premises
-    larg_premises, larg_conclusion = define_larger_argument()
-    prog, _mind, suf = larg_premises
-    combined = prog + " " + suf
-    print(f"P: {combined}")
-    print(f"H: {larg_conclusion}")
-    print(f"Prediction: {predict_nli(nli_model, combined, larg_conclusion)}")
-    print()
+    print(predict_nli(nli_model, p1, h1))
 
 
-def demonstrate_justification_need(nli_model):
-    """Show examples where NLI predictions need further justification."""
-    print("=== Justification Examples ===\n")
+def example_room_mbp_partial(nli_model):
+    """MBP single-premise (room_mbp) -> conclusion (with com_mbp omitted)."""
+    room_mbp = (
+        "As far as the Chinese is concerned, I simply behave like a computer. "
+        "I have inputs and outputs that are indistinguishable from those of "
+        "the native Chinese speaker, but I still understand nothing."
+    )
+    conc_mbp = (
+        "Computer understands nothing of any stories, whether in Chinese, "
+        "English, or whatever."
+    )
+    print(predict_nli(nli_model, room_mbp, conc_mbp))
 
-    # Analytic truth example
+
+def example_larg_partial(nli_model):
+    """LARG with 'prog' + 'suf' (omitting 'mind') -> conclusion."""
+    prog = "Implemented programs are by definition purely formal or syntactical."
+    suf = "Syntax is not by itself sufficient for, nor constitutive of, semantics."
+    conc_larg = "Implemented programs are not constitutive of minds."
+    print(predict_nli(nli_model, prog + " " + suf, conc_larg))
+
+
+# --- 4.4 helpers ---
+
+def example_quine(nli_model):
+    """'Quine is married' vs 'Quine is a bachelor' - clear contradiction."""
     p2 = "Quine is married."
     h2 = "Quine is a bachelor."
-    print(f"P: {p2}")
-    print(f"H: {h2}")
-    print(f"Prediction: {predict_nli(nli_model, p2, h2)}")
-    print()
+    print(predict_nli(nli_model, p2, h2))
 
-    # Argument with different premise orderings
-    larg_premises, larg_conclusion = define_larger_argument()
-    mind, prog = larg_premises[1], larg_premises[0]
 
-    print(f"P (mind+prog): {mind} {prog}")
-    print(f"H: {larg_conclusion}")
-    print(f"Prediction: {predict_nli(nli_model, mind + ' ' + prog, larg_conclusion)}")
-    print()
+def example_larg_orderings(nli_model):
+    """LARG with mind+prog and prog+mind premise orderings."""
+    mind = "Minds have mental or semantic contents."
+    prog = "Implemented programs are by definition purely formal or syntactical."
+    conc_larg = "Implemented programs are not constitutive of minds."
+    print(predict_nli(nli_model, mind + " " + prog, conc_larg))
+    print(predict_nli(nli_model, prog + " " + mind, conc_larg))
 
-    print(f"P (prog+mind): {prog} {mind}")
-    print(f"H: {larg_conclusion}")
-    print(f"Prediction: {predict_nli(nli_model, prog + ' ' + mind, larg_conclusion)}")
-    print()
 
-    # Intermediate conclusion examples
+def example_intermediate(nli_model):
+    """Examples showing the role of intermediate premises in justification."""
+    mind = "Minds have mental or semantic contents."
+    prog = "Implemented programs are by definition purely formal or syntactical."
+    conc_larg = "Implemented programs are not constitutive of minds."
     inter = "Programs with minds are mental and semantic."
     inter2 = "Minds with programs are mental and semantic."
 
-    print("--- With intermediate conclusions ---")
-    print(f"P: {mind} {prog}")
-    print(f"H: {larg_conclusion}")
-    print(f"  Direct:  {predict_nli(nli_model, mind + ' ' + prog, larg_conclusion)}")
+    print(predict_nli(nli_model, mind + " " + prog, conc_larg))
     print()
-    print(f"  Via '{inter}':")
-    print(f"    Step 1: {predict_nli(nli_model, mind + ' ' + prog, inter)}")
-    print(f"    Step 2: {predict_nli(nli_model, inter, larg_conclusion)}")
+    print(predict_nli(nli_model, mind + " " + prog, inter))
+    print(predict_nli(nli_model, inter, conc_larg))
     print()
-    print(f"  Via '{inter2}':")
-    print(f"    Step 1: {predict_nli(nli_model, mind + ' ' + prog, inter2)}")
-    print(f"    Step 2: {predict_nli(nli_model, inter2, larg_conclusion)}")
-
-
-def run_discussion(nli_model, combined_df, cra_stats, mbp_stats, wrapped_summaries):
-    """Run the full discussion/limits analysis.
-
-    Args:
-        nli_model: The CrossEncoder NLI model.
-        combined_df: Combined DataFrame from argument analysis.
-        cra_stats: Tuple of (num_sentences, num_words, num_unique_words) for CRA.
-        mbp_stats: Tuple of (num_sentences, num_words, num_unique_words) for MBP.
-        wrapped_summaries: Tuple of (wrapped_cra_summary, wrapped_mbp_summary).
-    """
-    cra_num_sentences, cra_num_words, _ = cra_stats
-    mbp_num_sentences, mbp_num_words, _ = mbp_stats
-    wrapped_cra_sum, wrapped_mbp_sum = wrapped_summaries
-
-    # 4.1 Limits of labeling argument types
-    print("=" * 60)
-    print("4.1 Limits of Labeling Argument Types")
-    print("=" * 60)
-    from nli_analysis import plot_match_percentages
-    plot_match_percentages(combined_df)
-    show_entailment_cases(combined_df)
-
-    # 4.2 Need for argument mining
-    print("=" * 60)
-    print("4.2 The Need for Argument Mining")
-    print("=" * 60)
-    print(f"CRA word count: {cra_num_words}")
-    print(f"MBP word count: {mbp_num_words}")
-    print()
-    print(f"CRA sentence count: {cra_num_sentences}")
-    print(f"MBP sentence count: {mbp_num_sentences}")
-    print()
-    plot_nli_complexity()
-
-    print("Summaries (for reference - may be inaccurate):")
-    print("Summary of CRA:")
-    print(wrapped_cra_sum)
-    print()
-    print("Summary of MBP:")
-    print(wrapped_mbp_sum)
-    print()
-
-    # Print conclusions for reference
-    _, conc_cra = define_mbp_argument()  # uses MBP's conclusion
-    _, conc_larg = define_larger_argument()
-    from nli_analysis import define_cra_argument
-    _, conc_cra_text = define_cra_argument()
-    print("Conclusions:")
-    print(f"  CRA: {conc_cra_text}")
-    print(f"  LARG: {conc_larg}")
-    print(f"  MBP: {conc_cra}")
-    print()
-
-    # 4.3 Need for probabilistic analysis
-    print("=" * 60)
-    print("4.3 The Need for Probabilistic Analysis")
-    print("=" * 60)
-    demonstrate_probabilistic_need(nli_model)
-
-    # 4.4 Need for justification
-    print("=" * 60)
-    print("4.4 The Need for Justification")
-    print("=" * 60)
-    demonstrate_justification_need(nli_model)
+    print(predict_nli(nli_model, mind + " " + prog, inter2))
+    print(predict_nli(nli_model, inter2, conc_larg))
