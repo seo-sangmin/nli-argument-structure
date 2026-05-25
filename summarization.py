@@ -8,23 +8,44 @@ to generate summaries of the CRA and MBP texts.
 import textwrap
 
 import torch
-from transformers import pipeline
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+MODEL_NAME = "pszemraj/long-t5-tglobal-base-16384-book-summary"
 
 
 def create_summarizer():
-    """Create a summarization pipeline using LongT5."""
-    device = 0 if torch.cuda.is_available() else -1
-    return pipeline(
-        "summarization",
-        "pszemraj/long-t5-tglobal-base-16384-book-summary",
-        device=device,
-    )
+    """Load the LongT5 tokenizer and model for summarization."""
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME).to(device)
+    model.eval()
+    return {"tokenizer": tokenizer, "model": model, "device": device}
 
 
 def summarize_text(summarizer, text):
     """Summarize a text and return the summary string."""
-    result = summarizer(text)
-    return result[0]["summary_text"]
+    tokenizer = summarizer["tokenizer"]
+    model = summarizer["model"]
+    device = summarizer["device"]
+
+    inputs = tokenizer(
+        text,
+        return_tensors="pt",
+        truncation=True,
+        max_length=16384,
+    ).to(device)
+
+    with torch.no_grad():
+        output_ids = model.generate(
+            **inputs,
+            max_length=512,
+            min_length=32,
+            num_beams=4,
+            no_repeat_ngram_size=3,
+            early_stopping=True,
+        )
+
+    return tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 
 def wrap_text(text, width=100):
