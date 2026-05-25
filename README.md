@@ -1,4 +1,4 @@
-\****This repo is being modularized and corrected based on the original python notebook (written in Sep 2023).***
+\****This repo modularizes the original python notebook, written in Sep 2023.***
 
 # Identifying Argument Structure in John Searle's Texts Using NLI
 
